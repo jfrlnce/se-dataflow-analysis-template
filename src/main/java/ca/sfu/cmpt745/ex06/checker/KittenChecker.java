@@ -21,24 +21,101 @@ import soot.toolkits.graph.DirectedGraph;
 import soot.toolkits.graph.ExceptionalUnitGraph;
 import soot.toolkits.graph.UnitGraph;
 
-
+import soot.toolkits.scalar.ForwardFlowAnalysis;
+import java.util.HashMap;
 
 public class KittenChecker extends BodyTransformer {
-  KittenChecker(KittenErrorReporter reporter) {
-    this.reporter = reporter;
-  }
+    final KittenErrorReporter reporter;
 
-  protected void internalTransform(Body body, String phase, Map options) {
-    UnitGraph graph = new ExceptionalUnitGraph(body);
+    KittenChecker(KittenErrorReporter reporter) {
+        this.reporter = reporter;
+    }
 
-    System.out.println("Implement your analysis here.");
-    //KittenAnalysis analysis = new KittenAnalysis(graph);
+    @Override
+    protected void internalTransform(Body body, String phase, Map options) {
+        UnitGraph graph = new ExceptionalUnitGraph(body);
+        KittenAnalysis analysis = new KittenAnalysis(graph, reporter);
+    }
 
-    // You should define and uncomment the kitten analysis above.
-    // Then explore the results and report potential errors using the provided
-    // reporter.
-  }
+    private class KittenAnalysis extends ForwardFlowAnalysis<Unit, Map<String, String>> {
+        private final UnitGraph graph;
+        private final KittenErrorReporter reporter;
 
-  final KittenErrorReporter reporter;
+        public KittenAnalysis(UnitGraph graph, KittenErrorReporter reporter) {
+            super(graph);
+            this.graph = graph;
+            this.reporter = reporter;
+            doAnalysis();
+        }
+
+        @Override
+        protected Map<String, String> newInitialFlow() {
+            return new HashMap<>();
+        }
+
+        @Override
+        protected Map<String, String> entryInitialFlow() {
+            return new HashMap<>();
+        }
+
+        @Override
+        protected void flowThrough(Map<String, String> current, Unit unit, Map<String, String> next) {
+            next.putAll(current);
+            if (unit instanceof InvokeStmt) {
+                InvokeStmt stmt = (InvokeStmt) unit;
+                InvokeExpr invokeExpr = stmt.getInvokeExpr();
+                if (invokeExpr instanceof InstanceInvokeExpr) {
+                    InstanceInvokeExpr instanceInvokeExpr = (InstanceInvokeExpr) invokeExpr;
+                    Local local = (Local) instanceInvokeExpr.getBase();
+                    String methodName = invokeExpr.getMethod().getName();
+                    String variableName = local.getName();
+                    String newState = mapMethodNameToState(methodName);
+                    String currentState = current.get(variableName);
+
+                    if (!isValidTransition(currentState, methodName)) {
+                        int line = unit.getJavaSourceStartLineNumber();
+                        reporter.reportError(variableName, line, newState, currentState);
+                    } else {
+                        next.put(variableName, newState);
+                    }
+                }
+            }
+        }
+
+        @Override
+        protected void merge(Map<String, String> in1, Map<String, String> in2, Map<String, String> out) {
+            out.clear();
+            out.putAll(in1);
+            in2.forEach((key, value) -> out.putIfAbsent(key, value));
+        }
+
+        @Override
+        protected void copy(Map<String, String> source, Map<String, String> dest) {
+            dest.clear();
+            dest.putAll(source);
+        }
+
+        private String mapMethodNameToState(String methodName) {
+            switch (methodName) {
+                case "pet": return "sleeping";
+                case "feed": return "eating";
+                case "tease": return "playing";
+                case "ignore": return "plotting";
+                case "scare": return "running";
+                default: return "unknown";
+            }
+        }
+
+        private boolean isValidTransition(String currentState, String methodName) {
+            switch (methodName) {
+                case "pet": return !currentState.equals("running") && !currentState.equals("playing");
+                case "tease": return !currentState.equals("sleeping") && !currentState.equals("eating");
+                case "ignore": return !currentState.equals("sleeping") && !currentState.equals("eating") && !currentState.equals("playing");
+                case "scare": return true; // "scare" is valid from any state
+                default: return true;
+            }
+        }
+    }
 }
+
 
