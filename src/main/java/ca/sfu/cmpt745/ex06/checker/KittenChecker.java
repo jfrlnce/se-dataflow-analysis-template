@@ -107,7 +107,7 @@ public class KittenChecker extends BodyTransformer {
 
         private boolean isValidTransition(String currentState, String methodName) {
           if (currentState == null || methodName == null) {
-            return false; // or true, depending on your logic
+            return false; 
           }
             switch (methodName) {
                 case "pet": return !currentState.equals("running") && !currentState.equals("playing");
