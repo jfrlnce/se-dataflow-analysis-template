@@ -3,6 +3,9 @@ package ca.sfu.cmpt745.ex06.checker;
 import java.util.Map;
 import java.util.EnumSet;
 
+import java.util.List;
+import java.util.ArrayList;
+
 import soot.Body;
 import soot.BodyTransformer;
 import soot.G;
@@ -71,9 +74,11 @@ public class KittenChecker extends BodyTransformer {
             dest.putAll(source);
         }
 
+        private Map<String, String> lastMethodCalled = new HashMap<>();
+        private Map<String, List<String>> methodSequenceContext = new HashMap<>();
         @Override
         protected void flowThrough(Map<String, String> current, Unit unit, Map<String, String> next) {
-            next.putAll(current); 
+            next.putAll(current);
 
             if (unit instanceof InvokeStmt) {
                 InvokeStmt stmt = (InvokeStmt) unit;
@@ -83,23 +88,21 @@ public class KittenChecker extends BodyTransformer {
                     String variableName = instanceInvokeExpr.getBase().toString();
                     String methodName = invokeExpr.getMethod().getName();
                     String currentState = current.getOrDefault(variableName, "sleeping");
+
                     String newState = mapMethodNameToState(methodName);
                     boolean validTransition = isValidTransition(currentState, methodName);
+                      System.out.println("Analyzing: " + variableName + ", Method: " + methodName + 
+                               ", Current State: " + currentState + ", New State: " + newState + 
+                               ", Valid Transition: " + validTransition);
 
-                    System.out.println("Analyzing: " + variableName + ", Method: " + methodName + 
-                                       ", Current State: " + currentState + ", New State: " + newState + 
-                                       ", Valid Transition: " + validTransition);
+                    methodSequenceContext.computeIfAbsent(variableName, k -> new ArrayList<>()).add(methodName);
 
                     if (validTransition) {
-                      next.put(variableName, newState);
-                      System.out.println("State Transition: " + variableName + " from " + 
-                                           currentState + " to " + newState);
-                
+                        System.out.println("State Transition: " + variableName + " from " + currentState + " to " + newState);
+                        next.put(variableName, newState);
+                        lastMethodCalled.put(variableName, methodName);
                     } else {
-                        int line = unit.getJavaSourceStartLineNumber();
-                        reporter.reportError(variableName, line, newState, currentState);
-                        System.out.println("Reported Error: " + variableName + " transition from " + 
-                                           currentState + " to " + newState + " at line " + line);
+                        reporter.reportError(variableName, unit.getJavaSourceStartLineNumber(), newState, currentState);
                     }
                 }
             }
