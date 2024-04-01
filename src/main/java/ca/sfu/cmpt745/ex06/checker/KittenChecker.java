@@ -59,29 +59,6 @@ public class KittenChecker extends BodyTransformer {
         }
 
         @Override
-        protected void flowThrough(Map<String, String> current, Unit unit, Map<String, String> next) {
-          next.putAll(current); 
-
-          if (unit instanceof InvokeStmt) {
-              InvokeStmt stmt = (InvokeStmt) unit;
-              InvokeExpr invokeExpr = stmt.getInvokeExpr();
-              if (invokeExpr instanceof InstanceInvokeExpr) {
-                  InstanceInvokeExpr instanceInvokeExpr = (InstanceInvokeExpr) invokeExpr;
-                  String variableName = instanceInvokeExpr.getBase().toString();
-                  String methodName = invokeExpr.getMethod().getName();
-                  String currentState = current.getOrDefault(variableName, "unknown");         
-                  String newState = mapMethodNameToState(methodName);           
-                  if (!isValidTransition(currentState, methodName)) {            
-                      int line = unit.getJavaSourceStartLineNumber();
-                      reporter.reportError(variableName, line, newState, currentState);
-                  } else {
-                      next.put(variableName, newState);
-                  }
-              }
-          }
-        }
-
-        @Override
         protected void merge(Map<String, String> in1, Map<String, String> in2, Map<String, String> out) {
             out.clear();
             out.putAll(in1);
@@ -94,6 +71,40 @@ public class KittenChecker extends BodyTransformer {
             dest.putAll(source);
         }
 
+        @Override
+        protected void flowThrough(Map<String, String> current, Unit unit, Map<String, String> next) {
+            next.putAll(current); 
+
+            if (unit instanceof InvokeStmt) {
+                InvokeStmt stmt = (InvokeStmt) unit;
+                InvokeExpr invokeExpr = stmt.getInvokeExpr();
+                if (invokeExpr instanceof InstanceInvokeExpr) {
+                    InstanceInvokeExpr instanceInvokeExpr = (InstanceInvokeExpr) invokeExpr;
+                    String variableName = instanceInvokeExpr.getBase().toString();
+                    String methodName = invokeExpr.getMethod().getName();
+                    String currentState = current.getOrDefault(variableName, "sleeping");
+                    String newState = mapMethodNameToState(methodName);
+                    boolean validTransition = isValidTransition(currentState, methodName);
+                    if (!validTransition) {
+                        int line = unit.getJavaSourceStartLineNumber();
+                        reporter.reportError(variableName, line, newState, currentState);
+                    } else {
+                        next.put(variableName, newState);
+                    }
+                }
+            }
+        }
+
+        private boolean isValidTransition(String currentState, String methodName) {
+            switch (methodName) {
+                case "pet": return !currentState.equals("running") && !currentState.equals("playing");
+                case "tease": return !currentState.equals("sleeping") && !currentState.equals("eating");
+                case "ignore": return !currentState.equals("sleeping") && !currentState.equals("eating") && !currentState.equals("playing");
+                case "scare": return true; 
+                default: return true; 
+            }
+        }
+
         private String mapMethodNameToState(String methodName) {
             switch (methodName) {
                 case "pet": return "sleeping";
@@ -101,20 +112,7 @@ public class KittenChecker extends BodyTransformer {
                 case "tease": return "playing";
                 case "ignore": return "plotting";
                 case "scare": return "running";
-                default: return "unknown";
-            }
-        }
-
-        private boolean isValidTransition(String currentState, String methodName) {
-          if (currentState == null || methodName == null) {
-            return false; 
-          }
-            switch (methodName) {
-                case "pet": return !currentState.equals("running") && !currentState.equals("playing");
-                case "tease": return !currentState.equals("sleeping") && !currentState.equals("eating");
-                case "ignore": return !currentState.equals("sleeping") && !currentState.equals("eating") && !currentState.equals("playing");
-                case "scare": return true; 
-                default: return true;
+                default: return "unknown"; 
             }
         }
     }
