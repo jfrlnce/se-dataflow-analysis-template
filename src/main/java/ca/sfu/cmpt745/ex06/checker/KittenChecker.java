@@ -60,33 +60,26 @@ public class KittenChecker extends BodyTransformer {
 
         @Override
         protected void flowThrough(Map<String, String> current, Unit unit, Map<String, String> next) {
-          next.putAll(current);
+          next.putAll(current); 
+
           if (unit instanceof InvokeStmt) {
               InvokeStmt stmt = (InvokeStmt) unit;
               InvokeExpr invokeExpr = stmt.getInvokeExpr();
               if (invokeExpr instanceof InstanceInvokeExpr) {
                   InstanceInvokeExpr instanceInvokeExpr = (InstanceInvokeExpr) invokeExpr;
-                  Local local = (Local) instanceInvokeExpr.getBase();
+                  String variableName = instanceInvokeExpr.getBase().toString();
                   String methodName = invokeExpr.getMethod().getName();
-                  // Ensure we get a non-null state for the current state
-                  String currentState = current.getOrDefault(local.getName(), "sleeping");
-
-                  // Prevent methodName from being null
-                  if (methodName != null && !methodName.isEmpty()) {
-                      String newState = mapMethodNameToState(methodName);
-                      // Ensuring currentState is never null
-                      currentState = currentState == null ? "unknown" : currentState;
-                      
-                      if (!isValidTransition(currentState, methodName)) {
-                          int line = unit.getJavaSourceStartLineNumber();
-                          reporter.reportError(local.getName(), line, newState, currentState);
-                      } else {
-                          next.put(local.getName(), newState);
-                      }
+                  String currentState = current.getOrDefault(variableName, "unknown");         
+                  String newState = mapMethodNameToState(methodName);           
+                  if (!isValidTransition(currentState, methodName)) {            
+                      int line = unit.getJavaSourceStartLineNumber();
+                      reporter.reportError(variableName, line, newState, currentState);
+                  } else {
+                      next.put(variableName, newState);
                   }
               }
           }
-      }
+        }
 
         @Override
         protected void merge(Map<String, String> in1, Map<String, String> in2, Map<String, String> out) {
@@ -114,7 +107,7 @@ public class KittenChecker extends BodyTransformer {
 
         private boolean isValidTransition(String currentState, String methodName) {
           if (currentState == null || methodName == null) {
-            return false; 
+            return false; // or true, depending on your logic
           }
             switch (methodName) {
                 case "pet": return !currentState.equals("running") && !currentState.equals("playing");
@@ -126,5 +119,4 @@ public class KittenChecker extends BodyTransformer {
         }
     }
 }
-
 
