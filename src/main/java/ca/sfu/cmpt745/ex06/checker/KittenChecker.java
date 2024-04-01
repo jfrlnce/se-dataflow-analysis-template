@@ -1,4 +1,4 @@
-package ca.sfu.cmpt745.ex06.checker;
+.cmpt745.ex06.checker;
 
 import java.util.Map;
 import java.util.EnumSet;
@@ -105,14 +105,21 @@ public class KittenChecker extends BodyTransformer {
         }
 
         private boolean isValidTransition(String currentState, String methodName) {
-            switch (methodName) {
-                case "pet": return !currentState.equals("running") && !currentState.equals("playing");
-                case "tease": return !currentState.equals("sleeping") && !currentState.equals("eating");
-                case "ignore": return !currentState.equals("sleeping") && !currentState.equals("eating") && !currentState.equals("playing");
-                case "scare": return true; 
-                default: return true; 
-            }
-        }
+          switch (methodName) {
+              case "pet":
+                  return !currentState.equals("running") && !currentState.equals("playing");
+              case "tease":
+                  return !currentState.equals("sleeping") && !currentState.equals("eating");
+              case "ignore":
+                  return !currentState.equals("sleeping") && !currentState.equals("eating") && !currentState.equals("playing");
+              case "feed":
+                    return true; 
+              case "scare": 
+                  return true;
+              default:
+                  return true;
+          }
+       }
 
         private String mapMethodNameToState(String methodName) {
             switch (methodName) {
