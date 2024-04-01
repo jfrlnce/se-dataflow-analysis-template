@@ -74,39 +74,35 @@ public class KittenChecker extends BodyTransformer {
             dest.putAll(source);
         }
 
-        private Map<String, String> lastMethodCalled = new HashMap<>();
-        private Map<String, List<String>> methodSequenceContext = new HashMap<>();
+        
         @Override
         protected void flowThrough(Map<String, String> current, Unit unit, Map<String, String> next) {
-            next.putAll(current);
-
-            if (unit instanceof InvokeStmt) {
-                InvokeStmt stmt = (InvokeStmt) unit;
+            out.putAll(in); // Copy the in-state to the out-state as the baseline
+    
+            // Proceed with analyzing Jimple statements
+            if (unit instanceof JInvokeStmt) { // Jimple's Invoke Statement
+                JInvokeStmt stmt = (JInvokeStmt) unit;
                 InvokeExpr invokeExpr = stmt.getInvokeExpr();
-                if (invokeExpr instanceof InstanceInvokeExpr) {
-                    InstanceInvokeExpr instanceInvokeExpr = (InstanceInvokeExpr) invokeExpr;
-                    String variableName = instanceInvokeExpr.getBase().toString();
+                if (invokeExpr instanceof JVirtualInvokeExpr) { // Jimple's Virtual Invoke Expression for instance methods
+                    JVirtualInvokeExpr virtualInvokeExpr = (JVirtualInvokeExpr) invokeExpr;
+                    Value baseValue = virtualInvokeExpr.getBase();
                     String methodName = invokeExpr.getMethod().getName();
-                    String currentState = current.getOrDefault(variableName, "sleeping");
-
-                    String newState = mapMethodNameToState(methodName);
-                    boolean validTransition = isValidTransition(currentState, methodName);
-                      System.out.println("Analyzing: " + variableName + ", Method: " + methodName + 
-                               ", Current State: " + currentState + ", New State: " + newState + 
-                               ", Valid Transition: " + validTransition);
-
-                    methodSequenceContext.computeIfAbsent(variableName, k -> new ArrayList<>()).add(methodName);
-
-                    if (validTransition) {
-                        System.out.println("State Transition: " + variableName + " from " + currentState + " to " + newState);
-                        next.put(variableName, newState);
-                        lastMethodCalled.put(variableName, methodName);
+                    
+                    // Simplified state tracking logic based on method invocation
+                    String variableName = baseValue.toString();
+                    String currentState = in.getOrDefault(variableName, "sleeping");
+                    String newState = determineNewState(currentState, methodName);
+                    
+                    // Validate the transition
+                    if (isValidTransition(currentState, methodName)) {
+                        out.put(variableName, newState); // Update the state on valid transition
                     } else {
+                        // Utilize the reporter for invalid transitions
                         reporter.reportError(variableName, unit.getJavaSourceStartLineNumber(), newState, currentState);
                     }
                 }
-            }
-        }
+              }
+          }
 
         private boolean isValidTransition(String currentState, String methodName) {
           switch (methodName) {
