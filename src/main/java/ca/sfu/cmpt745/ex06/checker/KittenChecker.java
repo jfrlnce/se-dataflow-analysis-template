@@ -61,26 +61,8 @@ public class KittenChecker extends BodyTransformer {
         @Override
         protected void merge(Map<String, String> in1, Map<String, String> in2, Map<String, String> out) {
             out.clear();
-            for (String key : in1.keySet()) {
-                String state1 = in1.get(key);
-                String state2 = in2.getOrDefault(key, state1); 
-                
-                String mergedState = mergeStates(state1, state2);
-                out.put(key, mergedState);
-            }
-
-            for (String key : in2.keySet()) {
-                if (!out.containsKey(key)) { 
-                    out.put(key, in2.get(key));
-                }
-            }
-        }
-
-        private String mergeStates(String state1, String state2) {
-            if (!state1.equals(state2)) {
-                return "unknown"; 
-            }
-            return state1;
+            out.putAll(in1);
+            in2.forEach((key, value) -> out.putIfAbsent(key, value));
         }
 
         @Override
@@ -151,4 +133,5 @@ public class KittenChecker extends BodyTransformer {
         }
     }
 }
+
 
