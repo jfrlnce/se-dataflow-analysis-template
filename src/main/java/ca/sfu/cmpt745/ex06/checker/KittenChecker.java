@@ -20,13 +20,9 @@ import soot.tagkit.Tag;
 import soot.toolkits.graph.DirectedGraph;
 import soot.toolkits.graph.ExceptionalUnitGraph;
 import soot.toolkits.graph.UnitGraph;
-import soot.jimple.Stmt;
-import soot.jimple.InvokeExpr;
-import soot.jimple.InstanceInvokeExpr;
+
 import soot.toolkits.scalar.ForwardFlowAnalysis;
 import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 
 public class KittenChecker extends BodyTransformer {
     final KittenErrorReporter reporter;
@@ -83,7 +79,6 @@ public class KittenChecker extends BodyTransformer {
                 handleInvokeStatement((InvokeStmt) unit, current, next);
             }
             
-            
             if (isLoopHead(unit)) {
                 Map<String, String> mergedState = mergeStatesAtLoopHead(unit, current);
                 Map<String, String> loopBodyState = analyzeLoopBody(unit, mergedState);
@@ -112,69 +107,16 @@ public class KittenChecker extends BodyTransformer {
 
         private boolean isLoopHead(Unit unit) {
             
-            return unit.branches(); 
+            return false; 
         }
 
-        private Map<String, String> mergeStatesAtLoopHead(Unit loopHead, UnitGraph graph, Map<Unit, Map<String, String>> unitToStateMap) {
-            Map<String, String> mergedState = new HashMap<>();
-            List<Unit> predecessors = graph.getPredsOf(loopHead);
-            for (Unit pred : predecessors) {
-                Map<String, String> predState = unitToStateMap.get(pred);
-                if (predState == null) continue; 
-                
-                for (Map.Entry<String, String> entry : predState.entrySet()) {
-                    String variable = entry.getKey();
-                    String state = entry.getValue();
-                    if (mergedState.containsKey(variable) && !mergedState.get(variable).equals(state)) {
-                        mergedState.put(variable, "unknown");
-                    } else if (!mergedState.containsKey(variable)) {
-                        mergedState.put(variable, state); 
-                    }
-                }
-            }
-
-            return mergedState;
-        }
-
-
-        private void updateStateBasedOnMethodCall(String variableName, String methodName, Map<String, String> currentStates) {
-            String newState = mapMethodNameToState(methodName);
-            String currentVariableState = currentStates.getOrDefault(variableName, "unknown");
-            if (isValidTransition(currentVariableState, methodName)) {
-                currentStates.put(variableName, newState);
-            } else {
-                currentStates.put(variableName, "error");
-            }
+        private Map<String, String> mergeStatesAtLoopHead(Unit loopHead, Map<String, String> current) {
+            
+            return new HashMap<>(current); 
         }
 
         private Map<String, String> analyzeLoopBody(Unit loopHead, Map<String, String> initialState) {
-            Map<String, String> currentState = new HashMap<>(initialState);
-
-            List<Unit> toVisit = graph.getSuccsOf(loopHead);
             
-            while (!toVisit.isEmpty()) {
-                Unit currentUnit = toVisit.remove(0); 
-                if (currentUnit instanceof Stmt) {
-                    Stmt stmt = (Stmt) currentUnit;
-                    
-                    if (stmt.containsInvokeExpr()) {
-                        InvokeExpr invokeExpr = stmt.getInvokeExpr();
-                        if (invokeExpr instanceof InstanceInvokeExpr) {
-                            InstanceInvokeExpr instanceInvokeExpr = (InstanceInvokeExpr) invokeExpr;
-                            String methodName = instanceInvokeExpr.getMethod().getName();
-                            String variableName = instanceInvokeExpr.getBase().toString();
-                            
-                            
-                            updateStateBasedOnMethodCall(variableName, methodName, currentState);
-                        }
-                    }
-                    
-                    
-                    toVisit.addAll(graph.getSuccsOf(currentUnit));
-                }
-            }
-            
-            return currentState;
         }
 
         private boolean isValidTransition(String currentState, String methodName) {
