@@ -20,15 +20,7 @@ import soot.tagkit.Tag;
 import soot.toolkits.graph.DirectedGraph;
 import soot.toolkits.graph.ExceptionalUnitGraph;
 import soot.toolkits.graph.UnitGraph;
-import soot.toolkits.graph.*;
-import soot.toolkits.scalar.*;
-import java.util.*;
-import java.util.stream.*;
-import soot.ValueBox;
-import java.util.List;
-import java.util.Set;
-import java.util.HashSet;
-import java.util.ArrayList;
+
 import soot.toolkits.scalar.ForwardFlowAnalysis;
 import java.util.HashMap;
 
@@ -114,128 +106,20 @@ public class KittenChecker extends BodyTransformer {
         }
 
 
-        private Set<Unit> findLoopHeaders(UnitGraph graph) {
-            Set<Unit> loopHeaders = new HashSet<>();
-            for (Unit unit : graph) {
-                
-                List<Unit> successors = graph.getSuccsOf(unit);
-                for (Unit succ : successors) {
-                    
-                    if (graph.isDominatedBy(succ, unit)) {
-                        loopHeaders.add(succ);
-                    }
-                }
-            }
-            return loopHeaders;
-        }
-
         private boolean isLoopHead(Unit unit) {
-            UnitGraph graph = new ExceptionalUnitGraph(body); 
-            Set<Unit> loopHeaders = findLoopHeaders(graph);
-            return loopHeaders.contains(unit);
+            
+            return false; 
         }
 
         private Map<String, String> mergeStatesAtLoopHead(Unit loopHead, Map<String, String> current) {
-            Map<String, String> mergedState = new HashMap<>(current);
-            List<Unit> predecessors = graph.getPredsOf(loopHead);
-            Set<String> variablesAffectedInLoop = new HashSet<>();
-            for (Unit pred : predecessors) {
-                if (pred instanceof Stmt) {
-                    Stmt stmt = (Stmt) pred;
-                    if (stmt.containsInvokeExpr()) {
-                        InvokeExpr invokeExpr = stmt.getInvokeExpr();
-                        if (invokeExpr instanceof InstanceInvokeExpr) {
-                            InstanceInvokeExpr instanceInvokeExpr = (InstanceInvokeExpr) invokeExpr;
-                            String variableName = instanceInvokeExpr.getBase().toString();
-                            variablesAffectedInLoop.add(variableName);
-                        }
-                    } else if (stmt instanceof AssignStmt) {
-                        AssignStmt assignStmt = (Stmt) pred;
-                        for (ValueBox vb : assignStmt.getDefBoxes()) {
-                            variablesAffectedInLoop.add(vb.getValue().toString());
-                        }
-                    }
-                }
-            }
-
-            for (String var : variablesAffectedInLoop) {
-                String conservativeState = getConservativeStateForVariable(var, graph, loopHead);
-                mergedState.put(var, conservativeState);
-            }
-
-            return mergedState;
-        }
-
-        private String getConservativeStateForVariable(String variable, UnitGraph graph, Unit loopHead) {
-            Set<String> possibleStates = new HashSet<>();
-
-            for (Unit unit : graph) {
-                if (unit instanceof Stmt) {
-                    Stmt stmt = (Stmt) unit;
-                    if (stmt.containsInvokeExpr()) {
-                        InvokeExpr invokeExpr = stmt.getInvokeExpr();
-                        if (invokeExpr instanceof InstanceInvokeExpr) {
-                            InstanceInvokeExpr instanceInvokeExpr = (InstanceInvokeExpr) invokeExpr;
-                            String baseVariable = instanceInvokeExpr.getBase().toString();
-                            if (baseVariable.equals(variable)) {
-                                String method = invokeExpr.getMethod().getName();
-                                String state = mapMethodNameToState(method);
-                                if (!state.equals("unknown")) {
-                                    possibleStates.add(state);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            if (possibleStates.isEmpty()) {
-                return "sleeping"; 
-            } else if (possibleStates.size() == 1) {
-                return possibleStates.iterator().next(); 
-            } else {
-                
-                return "unknown";
-            }
+            
+            return new HashMap<>(current); 
         }
 
         private Map<String, String> analyzeLoopBody(Unit loopHead, Map<String, String> initialState) {
-            Map<String, String> currentState = new HashMap<>(initialState);
-            boolean changesMade;
-
             
-            Set<Unit> visitedUnits = new HashSet<>();
-            List<Unit> worklist = new ArrayList<>();
-            worklist.add(loopHead);
-
-            do {
-                changesMade = false;
-
-                List<Unit> newWorklist = new ArrayList<>();
-                for (Unit unit : worklist) {
-                    if (visitedUnits.contains(unit)) continue; 
-                    visitedUnits.add(unit);
-
-        
-                    Map<String, String> nextState = new HashMap<>(currentState);
-                    if (unit instanceof InvokeStmt) {
-                        InvokeStmt stmt = (InvokeStmt) unit;
-                        handleInvokeStatement(stmt, currentState, nextState);
-                    }
-
-            
-                    if (!nextState.equals(currentState)) {
-                        changesMade = true;
-                        currentState.putAll(nextState); 
-                        newWorklist.addAll(graph.getSuccsOf(unit)); 
-                    }
-                }
-
-                worklist = newWorklist; 
-            } while (changesMade && !worklist.isEmpty());
-
-            return currentState; 
         }
+
         private boolean isValidTransition(String currentState, String methodName) {
             switch (methodName) {
                 case "pet": return !currentState.equals("running") && !currentState.equals("playing");
