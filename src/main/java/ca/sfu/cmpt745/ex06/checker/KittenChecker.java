@@ -111,11 +111,26 @@ public class KittenChecker extends BodyTransformer {
             return unit.branches(); 
         }
 
-        private Map<String, String> mergeStatesAtLoopHead(Unit loopHead, Map<String, String> current) {
-            
-            return new HashMap<>(current); 
-        }
+        private Map<String, String> mergeStatesAtLoopHead(Unit loopHead, UnitGraph graph, Map<Unit, Map<String, String>> unitToStateMap) {
+            Map<String, String> mergedState = new HashMap<>();
+            List<Unit> predecessors = graph.getPredsOf(loopHead);
+            for (Unit pred : predecessors) {
+                Map<String, String> predState = unitToStateMap.get(pred);
+                if (predState == null) continue; 
+                
+                for (Map.Entry<String, String> entry : predState.entrySet()) {
+                    String variable = entry.getKey();
+                    String state = entry.getValue();
+                    if (mergedState.containsKey(variable) && !mergedState.get(variable).equals(state)) {
+                        mergedState.put(variable, "unknown");
+                    } else if (!mergedState.containsKey(variable)) {
+                        mergedState.put(variable, state); 
+                    }
+                }
+            }
 
+            return mergedState;
+        }
         private Map<String, String> analyzeLoopBody(Unit loopHead, Map<String, String> initialState) {
             
         }
