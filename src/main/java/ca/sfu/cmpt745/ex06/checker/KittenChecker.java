@@ -49,31 +49,32 @@ public class KittenChecker extends BodyTransformer {
         }
 
         @Override
-        protected Map<String, Set<String>> newInitialFlow() {
+        protected Map<String, String> newInitialFlow() {
             return new HashMap<>();
         }
 
         @Override
-        protected Map<String, Set<String>> entryInitialFlow() {
+        protected Map<String, String> entryInitialFlow() {
             return new HashMap<>();
         }
 
         @Override
-        protected void merge(Map<String, Set<String>> in1, Map<String, Set<String>> in2, Map<String, Set<String>> out) {
+        protected void merge(Map<String, String> in1, Map<String, String> in2, Map<String, String> out) {
             out.clear();
-            in1.forEach((key, value) -> out.put(key, new HashSet<>(value)));
-            in2.forEach((key, value) -> out.merge(key, value, (v1, v2) -> { v1.addAll(v2); return v1; }));
+            out.putAll(in1);
+            in2.forEach((key, value) -> out.putIfAbsent(key, value));
         }
 
         @Override
-        protected void copy(Map<String, Set<String>> source, Map<String, Set<String>> dest) {
+        protected void copy(Map<String, String> source, Map<String, String> dest) {
             dest.clear();
-            source.forEach((key, value) -> dest.put(key, new HashSet<>(value)));
+            dest.putAll(source);
         }
 
         @Override
-        protected void flowThrough(Map<String, Set<String>> current, Unit unit, Map<String, Set<String>> next) {
-            next.putAll(current);
+        protected void flowThrough(Map<String, String> current, Unit unit, Map<String, String> next) {
+            next.putAll(current); 
+
             if (unit instanceof InvokeStmt) {
                 InvokeStmt stmt = (InvokeStmt) unit;
                 InvokeExpr invokeExpr = stmt.getInvokeExpr();
@@ -81,61 +82,18 @@ public class KittenChecker extends BodyTransformer {
                     InstanceInvokeExpr instanceInvokeExpr = (InstanceInvokeExpr) invokeExpr;
                     String variableName = instanceInvokeExpr.getBase().toString();
                     String methodName = invokeExpr.getMethod().getName();
-                    Set<String> currentStates = current.getOrDefault(variableName, new HashSet<>(Arrays.asList("sleeping")));
-                    Set<String> newStates = new HashSet<>();
-                    for (String state : currentStates) {
-                        if (isValidTransition(state, methodName)) {
-                            newStates.add(mapMethodNameToState(methodName));
-                        } else {
-                            reportError(variableName, stmt, state, mapMethodNameToState(methodName));
-                        }
-                    }
-                    if (!newStates.isEmpty()) {
-                        next.put(variableName, newStates);
+                    String currentState = current.getOrDefault(variableName, "sleeping");
+                    String newState = mapMethodNameToState(methodName);
+                    boolean validTransition = isValidTransition(currentState, methodName);
+                    if (!validTransition) {
+                        int line = unit.getJavaSourceStartLineNumber();
+                        reporter.reportError(variableName, line, newState, currentState);
+                    } else {
+                        next.put(variableName, newState);
                     }
                 }
             }
-            if (isLoopHead(unit)) {
-                handleLoop(next);
-            }
         }
-
-        private boolean isLoopHead(Unit unit) {
-            
-            List<Unit> successors = graph.getSuccsOf(unit);
-
-            
-            for (Unit succ : successors) {
-                if (graph.isDominatorOf(succ, unit)) {
-                   
-                    return true;
-                }
-            }
-            return false;
-        }
-
-
-        private void handleLoop(Map<String, Set<String>> states) {
-            
-            for (Map.Entry<String, Set<String>> entry : states.entrySet()) {
-                String variableName = entry.getKey();
-            
-                Set<String> allPossibleStates = getAllPossibleStates();
-
-                // Conservatively assume the variable could transition to any state due to the loop
-                states.put(variableName, allPossibleStates);
-            }
-        }
-
-        private Set<String> getAllPossibleStates() {
-         
-            return new HashSet<>(Arrays.asList("sleeping", "eating", "playing", "plotting", "running"));
-        }
-        private void reportError(String variableName, InvokeStmt stmt, String currentState, String targetState) {
-            int line = stmt.getJavaSourceStartLineNumber();
-            reporter.reportError(variableName, line, targetState, currentState);
-        }
-        
 
         private boolean isValidTransition(String currentState, String methodName) {
             switch (methodName) {
