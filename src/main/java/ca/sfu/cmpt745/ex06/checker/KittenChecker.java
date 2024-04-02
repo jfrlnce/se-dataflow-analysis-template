@@ -24,7 +24,11 @@ import soot.toolkits.graph.*;
 import soot.toolkits.scalar.*;
 import java.util.*;
 import java.util.stream.*;
-
+import soot.ValueBox;
+import java.util.List;
+import java.util.Set;
+import java.util.HashSet;
+import java.util.ArrayList;
 import soot.toolkits.scalar.ForwardFlowAnalysis;
 import java.util.HashMap;
 
@@ -83,7 +87,7 @@ public class KittenChecker extends BodyTransformer {
                 handleInvokeStatement((InvokeStmt) unit, current, next);
             }
             
-            // Loop detection and handling
+            
             if (isLoopHead(unit)) {
                 Map<String, String> mergedState = mergeStatesAtLoopHead(unit, current);
                 Map<String, String> loopBodyState = analyzeLoopBody(unit, mergedState);
@@ -110,20 +114,25 @@ public class KittenChecker extends BodyTransformer {
         }
 
 
-        private boolean isLoopHead(Unit unit) {
-            
-            LoopFinder loopFinder = new LoopFinder();
-            loopFinder.transform(graph.getBody());
-            Collection<Loop> loops = loopFinder.loops();
-
-            
-            for (Loop loop : loops) {
-                if (loop.getHead().equals(unit)) {
-                    return true; 
+        private Set<Unit> findLoopHeaders(UnitGraph graph) {
+            Set<Unit> loopHeaders = new HashSet<>();
+            for (Unit unit : graph) {
+                
+                List<Unit> successors = graph.getSuccsOf(unit);
+                for (Unit succ : successors) {
+                    
+                    if (graph.isDominatedBy(succ, unit)) {
+                        loopHeaders.add(succ);
+                    }
                 }
             }
+            return loopHeaders;
+        }
 
-            return false; 
+        private boolean isLoopHead(Unit unit) {
+            UnitGraph graph = new ExceptionalUnitGraph(body); 
+            Set<Unit> loopHeaders = findLoopHeaders(graph);
+            return loopHeaders.contains(unit);
         }
 
         private Map<String, String> mergeStatesAtLoopHead(Unit loopHead, Map<String, String> current) {
@@ -135,7 +144,7 @@ public class KittenChecker extends BodyTransformer {
                     Stmt stmt = (Stmt) pred;
                     if (stmt.containsInvokeExpr()) {
                         InvokeExpr invokeExpr = stmt.getInvokeExpr();
-                        if (invokeExpr.getInvokeExprType() instanceof InstanceInvokeExpr) {
+                        if (invokeExpr instanceof InstanceInvokeExpr) {
                             InstanceInvokeExpr instanceInvokeExpr = (InstanceInvokeExpr) invokeExpr;
                             String variableName = instanceInvokeExpr.getBase().toString();
                             variablesAffectedInLoop.add(variableName);
