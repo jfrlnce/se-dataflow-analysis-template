@@ -108,6 +108,17 @@ public class KittenChecker extends BodyTransformer {
 
         private boolean isLoopHead(Unit unit) {
             
+            LoopFinder loopFinder = new LoopFinder();
+            loopFinder.transform(graph.getBody());
+            Collection<Loop> loops = loopFinder.loops();
+
+            
+            for (Loop loop : loops) {
+                if (loop.getHead().equals(unit)) {
+                    return true; 
+                }
+            }
+
             return false; 
         }
 
@@ -142,6 +153,7 @@ public class KittenChecker extends BodyTransformer {
         }
     }
 }
+
 
 
 
