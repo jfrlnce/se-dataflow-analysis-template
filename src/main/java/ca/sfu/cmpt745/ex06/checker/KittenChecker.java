@@ -154,7 +154,36 @@ public class KittenChecker extends BodyTransformer {
         }
 
         private String getConservativeStateForVariable(String variable, UnitGraph graph, Unit loopHead) {
-            return "unknown"
+            Set<String> possibleStates = new HashSet<>();
+
+            for (Unit unit : graph) {
+                if (unit instanceof Stmt) {
+                    Stmt stmt = (Stmt) unit;
+                    if (stmt.containsInvokeExpr()) {
+                        InvokeExpr invokeExpr = stmt.getInvokeExpr();
+                        if (invokeExpr instanceof InstanceInvokeExpr) {
+                            InstanceInvokeExpr instanceInvokeExpr = (InstanceInvokeExpr) invokeExpr;
+                            String baseVariable = instanceInvokeExpr.getBase().toString();
+                            if (baseVariable.equals(variable)) {
+                                String method = invokeExpr.getMethod().getName();
+                                String state = mapMethodNameToState(method);
+                                if (!state.equals("unknown")) {
+                                    possibleStates.add(state);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (possibleStates.isEmpty()) {
+                return "sleeping"; 
+            } else if (possibleStates.size() == 1) {
+                return possibleStates.iterator().next(); 
+            } else {
+                
+                return "unknown";
+            }
         }
 
         private Map<String, String> analyzeLoopBody(Unit loopHead, Map<String, String> initialState) {
@@ -183,7 +212,5 @@ public class KittenChecker extends BodyTransformer {
         }
     }
 }
-
-
 
 
