@@ -72,32 +72,35 @@ public class KittenChecker extends BodyTransformer {
         }
 
         @Override
-        protected void flowThrough(Map<String, String> current, Unit unit, Map<String, String> out) {
-             out.putAll(in); 
+        protected void flowThrough(Map<String, String> current, Unit unit, Map<String, String> next) {
+            next.putAll(current); 
 
-            if (unit instanceof JInvokeStmt) {
-                JInvokeStmt invokeStmt = (JInvokeStmt) unit;
-                InvokeExpr invokeExpr = invokeStmt.getInvokeExpr();
+            if (unit instanceof InvokeStmt) {
+                InvokeStmt stmt = (InvokeStmt) unit;
+                InvokeExpr invokeExpr = stmt.getInvokeExpr();
+                if (invokeExpr instanceof InstanceInvokeExpr) {
+                    InstanceInvokeExpr instanceInvokeExpr = (InstanceInvokeExpr) invokeExpr;
+                    String variableName = instanceInvokeExpr.getBase().toString();
+                    String methodName = invokeExpr.getMethod().getName();
+                    String currentState = current.getOrDefault(variableName, "sleeping");
+                    String newState = mapMethodNameToState(methodName);
+                    boolean validTransition = isValidTransition(currentState, methodName);
 
-                if (invokeExpr instanceof JVirtualInvokeExpr) {
-                    JVirtualInvokeExpr virtualInvokeExpr = (JVirtualInvokeExpr) invokeExpr;
-                    Value base = virtualInvokeExpr.getBase();
-                    SootMethod method = invokeExpr.getMethod();
+                    System.out.println("Analyzing: " + variableName + ", Method: " + methodName + 
+                                       ", Current State: " + currentState + ", New State: " + newState + 
+                                       ", Valid Transition: " + validTransition);
 
-                    if (method.getDeclaringClass().getName().equals("Kitten")) {
-                        String methodName = method.getName();
-                        String variableName = base.toString();
-                        String currentState = in.getOrDefault(variableName, "sleeping");
-                        String newState = mapMethodNameToState(methodName);
-
-                        if (!isValidTransition(currentState, methodName)) {
-                            
-                            reporter.reportError(body.getMethod().getDeclaringClass().getName(),
-                                                 body.getMethod().getName(), unit.getJavaSourceStartLineNumber(),
-                                                 newState, currentState);
-                        } else {
-                            out.put(variableName, newState); 
-                        }
+                    if (validTransition) {
+                      next.put(variableName, newState);
+                      System.out.println("State Transition: " + variableName + " from " + 
+                                           currentState + " to " + newState);
+                      currentState = newState; 
+                
+                    } else {
+                        int line = unit.getJavaSourceStartLineNumber();
+                        reporter.reportError(variableName, line, newState, currentState);
+                        System.out.println("Reported Error: " + variableName + " transition from " + 
+                                           currentState + " to " + newState + " at line " + line);
                     }
                 }
             }
@@ -132,4 +135,5 @@ public class KittenChecker extends BodyTransformer {
         }
     }
 }
+
 
