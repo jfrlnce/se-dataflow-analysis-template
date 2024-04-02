@@ -72,176 +72,38 @@ public class KittenChecker extends BodyTransformer {
         }
 
         @Override
-        protected void flowThrough(Map<String, String> in, Unit unit, Map<String, String> out) {
-          out.putAll(in);         
-          processUnit(unit, in, out);
-          if (isLoopHeader(unit) || isConditionalBranch(unit)) {
-              saveStateForUnit(unit, in);
-          }
-          if (isLoopEnd(unit) || isConditionalJoin(unit)) {
-              Map<String, String> savedState = getSavedStateForUnit(unit);
-              Map<String, String> mergedState = mergeSavedStateWithCurrent(savedState, out);
-              out.clear();
-              out.putAll(mergedState);
-          }
-        }
+        protected void flowThrough(Map<String, String> current, Unit unit, Map<String, String> next) {
+            next.putAll(current); 
 
-
-        private void processUnit(Unit unit, Map<String, String> in, Map<String, String> out) {
             if (unit instanceof InvokeStmt) {
-                InvokeStmt invokeStmt = (InvokeStmt) unit;
-                InvokeExpr invokeExpr = invokeStmt.getInvokeExpr();
-                processInvokeExpr(invokeExpr, in, out, unit);
-            } else if (unit instanceof DefinitionStmt) {
-                DefinitionStmt definitionStmt = (DefinitionStmt) unit;
-                Value rightOp = definitionStmt.getRightOp();
-                if (rightOp instanceof InvokeExpr) {
-                    processInvokeExpr((InvokeExpr) rightOp, in, out, unit);
-                }
-            }
-        }
-
-        private void processInvokeExpr(InvokeExpr invokeExpr, Map<String, String> in, Map<String, String> out, Unit unit) {
-            if (!(invokeExpr instanceof InstanceInvokeExpr)) return;
-
-            InstanceInvokeExpr instanceInvokeExpr = (InstanceInvokeExpr) invokeExpr;
-            String methodName = invokeExpr.getMethod().getName();
-            SootMethod method = invokeExpr.getMethod();
-            if (!method.getDeclaringClass().getName().equals("Kitten")) return;
-
-            String variableName = instanceInvokeExpr.getBase().toString();
-            String newState = mapMethodNameToState(methodName);
-            String currentState = in.getOrDefault(variableName, "sleeping"); 
-            if (!isValidTransition(currentState, newState)) {
-                
-                int line = unit.getJavaSourceStartLineNumber();
-                reporter.reportError(variableName, line, newState, currentState);
-            } else {
-                out.put(variableName, newState);
-            }
-        }
-
-        private boolean isLoopHeader(Unit unit) {
-            Body body = this.body; 
-            DirectedGraph<Unit> graph = new ExceptionalUnitGraph(body);
-            List<Unit> loopHeaders = new ArrayList<>();
-            for (Unit u : graph) {
-                for (Unit succ : graph.getSuccsOf(u)) {
-                    if (graph.getPredsOf(succ).contains(u) && body.getUnits().indexOf(succ) < body.getUnits().indexOf(u)) {
-                        loopHeaders.add(succ);
+                InvokeStmt stmt = (InvokeStmt) unit;
+                InvokeExpr invokeExpr = stmt.getInvokeExpr();
+                if (invokeExpr instanceof InstanceInvokeExpr) {
+                    InstanceInvokeExpr instanceInvokeExpr = (InstanceInvokeExpr) invokeExpr;
+                    String variableName = instanceInvokeExpr.getBase().toString();
+                    String methodName = invokeExpr.getMethod().getName();
+                    String currentState = current.getOrDefault(variableName, "sleeping");
+                    String newState = mapMethodNameToState(methodName);
+                    boolean validTransition = isValidTransition(currentState, methodName);
+                    if (!validTransition) {
+                        int line = unit.getJavaSourceStartLineNumber();
+                        reporter.reportError(variableName, line, newState, currentState);
+                    } else {
+                        next.put(variableName, newState);
                     }
                 }
             }
-            
-            return loopHeaders.contains(unit);
-        }
-
-        private boolean isLoopEnd(Unit unit) {
-            
-            DirectedGraph<Unit> graph = this.graph;
-            Set<Unit> loopHeaders = new HashSet<>(findLoopHeaders(this.body)); 
-            for (Unit header : loopHeaders) {
-                if (graph.getPredsOf(header).contains(unit)) {
-                    return true;
-                }
-
-          
-                for (Unit succ : graph.getSuccsOf(unit)) {
-                    if (!loopHeaders.contains(succ) && allSuccessorsOutsideLoop(succ, graph, loopHeaders)) {
-                        return true; 
-                    }
-                }
-            }
-            return false;
-        }
-
-        private boolean allSuccessorsOutsideLoop(Unit unit, DirectedGraph<Unit> graph, Set<Unit> loopHeaders) {
-            
-            for (Unit succ : graph.getSuccsOf(unit)) {  
-                if (loopHeaders.contains(succ) || graph.getPredsOf(succ).stream().anyMatch(loopHeaders::contains)) {
-                    return false;
-                }
-            }
-            return true; 
-        }
-
-        private Set<Unit> findLoopHeaders(Body body) {
-            Set<Unit> loopHeaders = new HashSet<>();
-            DirectedGraph<Unit> graph = new ExceptionalUnitGraph(body);
-            for (Unit u : graph) {
-                for (Unit succ : graph.getSuccsOf(u)) {
-                    if (graph.getPredsOf(succ).contains(u) && body.getUnits().indexOf(succ) < body.getUnits().indexOf(u)) {
-                        loopHeaders.add(succ);
-                    }
-                }
-            }
-            return loopHeaders;
-        }
-
-        private boolean isConditionalBranch(Unit unit) {
-            return unit instanceof IfStmt;
-        }
-
-        private boolean isConditionalJoin(Unit unit) {
-            DirectedGraph<Unit> graph = this.graph;         
-            List<Unit> predecessors = graph.getPredsOf(unit);
-            if (predecessors.size() <= 1) {
-                return false; 
-            }
-            
-            for (Unit pred : predecessors) {
-    
-                for (Unit succ : graph.getSuccsOf(pred)) {
-                    if (succ.equals(unit) && pred instanceof IfStmt) {
-                        return true; 
-                    }
-                }
-            }
-
-           
-            return false;
-        }
-
-
-        private Map<String, String> mergeSavedStateWithCurrent(Map<String, String> savedState, Map<String, String> currentState) {
-            
-            Map<String, String> mergedState = new HashMap<>(currentState);
-            
-            
-            savedState.forEach((kitten, state) -> {
-                if (currentState.containsKey(kitten)) {
-                    String currentStateForKitten = currentState.get(kitten);
-                    
-                    if (!state.equals(currentStateForKitten)) {
-                      
-                        mergedState.put(kitten, "unknown");
-                    }
-                    
-                } else {
-                    
-                    mergedState.put(kitten, state);
-                }
-            });
-            
-            return mergedState;
         }
 
         private boolean isValidTransition(String currentState, String methodName) {
-          switch (methodName) {
-              case "pet":
-                  return !currentState.equals("running") && !currentState.equals("playing");
-              case "tease":
-                  return !currentState.equals("sleeping") && !currentState.equals("eating");
-              case "ignore":
-                  return !currentState.equals("sleeping") && !currentState.equals("eating") && !currentState.equals("playing");
-              case "feed":
-                    return true; 
-              case "scare": 
-                  return true;
-              default:
-                  return true;
-          }
-       }
+            switch (methodName) {
+                case "pet": return !currentState.equals("running") && !currentState.equals("playing");
+                case "tease": return !currentState.equals("sleeping") && !currentState.equals("eating");
+                case "ignore": return !currentState.equals("sleeping") && !currentState.equals("eating") && !currentState.equals("playing");
+                case "scare": return true; 
+                default: return true; 
+            }
+        }
 
         private String mapMethodNameToState(String methodName) {
             switch (methodName) {
@@ -255,7 +117,6 @@ public class KittenChecker extends BodyTransformer {
         }
     }
 }
-
 
 
 
