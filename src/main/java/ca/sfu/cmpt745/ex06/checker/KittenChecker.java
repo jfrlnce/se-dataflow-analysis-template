@@ -49,75 +49,72 @@ public class KittenChecker extends BodyTransformer {
         }
 
         @Override
-        protected Map<String, String> newInitialFlow() {
+        protected Map<String, Set<String>> newInitialFlow() {
             return new HashMap<>();
         }
 
         @Override
-        protected Map<String, String> entryInitialFlow() {
+        protected Map<String, Set<String>> entryInitialFlow() {
             return new HashMap<>();
         }
 
         @Override
-        protected void merge(Map<String, String> in1, Map<String, String> in2, Map<String, String> out) {
+        protected void merge(Map<String, Set<String>> in1, Map<String, Set<String>> in2, Map<String, Set<String>> out) {
             out.clear();
-            out.putAll(in1);
-            in2.forEach((key, value) -> out.putIfAbsent(key, value));
+            in1.forEach((key, value) -> out.put(key, new HashSet<>(value)));
+            in2.forEach((key, value) -> out.merge(key, value, (v1, v2) -> { v1.addAll(v2); return v1; }));
         }
 
         @Override
-        protected void copy(Map<String, String> source, Map<String, String> dest) {
+        protected void copy(Map<String, Set<String>> source, Map<String, Set<String>> dest) {
             dest.clear();
-            dest.putAll(source);
+            source.forEach((key, value) -> dest.put(key, new HashSet<>(value)));
         }
 
         @Override
-        protected void flowThrough(Map<String, String> current, Unit unit, Map<String, String> next) {
-            next.putAll(current); 
-
+        protected void flowThrough(Map<String, Set<String>> current, Unit unit, Map<String, Set<String>> next) {
+            next.putAll(current);
             if (unit instanceof InvokeStmt) {
-                handleInvokeStatement((InvokeStmt) unit, current, next);
-            }
-            
-            if (isLoopHead(unit)) {
-                Map<String, String> mergedState = mergeStatesAtLoopHead(unit, current);
-                Map<String, String> loopBodyState = analyzeLoopBody(unit, mergedState);
-                next.putAll(loopBodyState);
-            }
-        }
-
-        private void handleInvokeStatement(InvokeStmt stmt, Map<String, String> current, Map<String, String> next) {
-            InvokeExpr invokeExpr = stmt.getInvokeExpr();
-            if (invokeExpr instanceof InstanceInvokeExpr) {
-                InstanceInvokeExpr instanceInvokeExpr = (InstanceInvokeExpr) invokeExpr;
-                String variableName = instanceInvokeExpr.getBase().toString();
-                String methodName = invokeExpr.getMethod().getName();
-                String currentState = current.getOrDefault(variableName, "sleeping");
-                String newState = mapMethodNameToState(methodName);
-                boolean validTransition = isValidTransition(currentState, methodName);
-                if (!validTransition) {
-                    int line = stmt.getJavaSourceStartLineNumber();
-                    reporter.reportError(variableName, line, newState, currentState);
-                } else {
-                    next.put(variableName, newState);
+                InvokeStmt stmt = (InvokeStmt) unit;
+                InvokeExpr invokeExpr = stmt.getInvokeExpr();
+                if (invokeExpr instanceof InstanceInvokeExpr) {
+                    InstanceInvokeExpr instanceInvokeExpr = (InstanceInvokeExpr) invokeExpr;
+                    String variableName = instanceInvokeExpr.getBase().toString();
+                    String methodName = invokeExpr.getMethod().getName();
+                    Set<String> currentStates = current.getOrDefault(variableName, new HashSet<>(Arrays.asList("sleeping")));
+                    Set<String> newStates = new HashSet<>();
+                    for (String state : currentStates) {
+                        if (isValidTransition(state, methodName)) {
+                            newStates.add(mapMethodNameToState(methodName));
+                        } else {
+                            reportError(variableName, stmt, state, mapMethodNameToState(methodName));
+                        }
+                    }
+                    if (!newStates.isEmpty()) {
+                        next.put(variableName, newStates);
+                    }
                 }
             }
+            if (isLoopHead(unit)) {
+                handleLoop(next);
+            }
         }
 
-
-        private boolean isLoopHead(Unit unit) {
+        private boolean isValidTransition(String currentState, String methodName) {
             
-            return false; 
+            return true; 
         }
 
-        private Map<String, String> mergeStatesAtLoopHead(Unit loopHead, Map<String, String> current) {
-            
-            return new HashMap<>(current); 
+        private String mapMethodNameToState(String methodName) {
+           
+            return "unknown"; 
         }
 
-        private Map<String, String> analyzeLoopBody(Unit loopHead, Map<String, String> initialState) {
-            
+        private void reportError(String variableName, InvokeStmt stmt, String currentState, String targetState) {
+            int line = stmt.getJavaSourceStartLineNumber();
+            reporter.reportError(variableName, line, targetState, currentState);
         }
+        
 
         private boolean isValidTransition(String currentState, String methodName) {
             switch (methodName) {
