@@ -100,16 +100,27 @@ public class KittenChecker extends BodyTransformer {
             }
         }
 
-        private boolean isValidTransition(String currentState, String methodName) {
+        private boolean isLoopHead(Unit unit) {
             
-            return true; 
+            List<Unit> successors = graph.getSuccsOf(unit);
+
+            
+            for (Unit succ : successors) {
+                if (graph.isDominatorOf(succ, unit)) {
+                   
+                    return true;
+                }
+            }
+            return false;
         }
 
-        private String mapMethodNameToState(String methodName) {
-           
-            return "unknown"; 
-        }
 
+        private void handleLoop(Map<String, Set<String>> states) {
+            
+            states.forEach((variable, possibleStates) -> {
+                
+            });
+        }
         private void reportError(String variableName, InvokeStmt stmt, String currentState, String targetState) {
             int line = stmt.getJavaSourceStartLineNumber();
             reporter.reportError(variableName, line, targetState, currentState);
