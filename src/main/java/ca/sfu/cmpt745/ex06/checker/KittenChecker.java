@@ -123,8 +123,38 @@ public class KittenChecker extends BodyTransformer {
         }
 
         private Map<String, String> mergeStatesAtLoopHead(Unit loopHead, Map<String, String> current) {
-            
-            return new HashMap<>(current); 
+            Map<String, String> mergedState = new HashMap<>(current);
+            List<Unit> predecessors = graph.getPredsOf(loopHead);
+            Set<String> variablesAffectedInLoop = new HashSet<>();
+            for (Unit pred : predecessors) {
+                if (pred instanceof Stmt) {
+                    Stmt stmt = (Stmt) pred;
+                    if (stmt.containsInvokeExpr()) {
+                        InvokeExpr invokeExpr = stmt.getInvokeExpr();
+                        if (invokeExpr.getInvokeExprType() instanceof InstanceInvokeExpr) {
+                            InstanceInvokeExpr instanceInvokeExpr = (InstanceInvokeExpr) invokeExpr;
+                            String variableName = instanceInvokeExpr.getBase().toString();
+                            variablesAffectedInLoop.add(variableName);
+                        }
+                    } else if (stmt instanceof AssignStmt) {
+                        AssignStmt assignStmt = (Stmt) pred;
+                        for (ValueBox vb : assignStmt.getDefBoxes()) {
+                            variablesAffectedInLoop.add(vb.getValue().toString());
+                        }
+                    }
+                }
+            }
+
+            for (String var : variablesAffectedInLoop) {
+                String conservativeState = getConservativeStateForVariable(var, graph, loopHead);
+                mergedState.put(var, conservativeState);
+            }
+
+            return mergedState;
+        }
+
+        private String getConservativeStateForVariable(String variable, UnitGraph graph, Unit loopHead) {
+            return "unknown"
         }
 
         private Map<String, String> analyzeLoopBody(Unit loopHead, Map<String, String> initialState) {
