@@ -108,7 +108,7 @@ public class KittenChecker extends BodyTransformer {
 
         private boolean isLoopHead(Unit unit) {
             
-            return false; 
+            return unit.branches(); 
         }
 
         private Map<String, String> mergeStatesAtLoopHead(Unit loopHead, Map<String, String> current) {
