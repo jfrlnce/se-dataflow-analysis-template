@@ -20,6 +20,10 @@ import soot.tagkit.Tag;
 import soot.toolkits.graph.DirectedGraph;
 import soot.toolkits.graph.ExceptionalUnitGraph;
 import soot.toolkits.graph.UnitGraph;
+import soot.toolkits.graph.*;
+import soot.toolkits.scalar.*;
+import java.util.*;
+import java.util.stream.*;
 
 import soot.toolkits.scalar.ForwardFlowAnalysis;
 import java.util.HashMap;
