@@ -86,21 +86,17 @@ public class KittenChecker extends BodyTransformer {
                     String newState = mapMethodNameToState(methodName);
                     boolean validTransition = isValidTransition(currentState, methodName);
 
-                    System.out.println("Analyzing: " + variableName + ", Method: " + methodName + 
-                                       ", Current State: " + currentState + ", New State: " + newState + 
-                                       ", Valid Transition: " + validTransition);
+                   
 
-                    if (validTransition) {
-                      next.put(variableName, newState);
-                      System.out.println("State Transition: " + variableName + " from " + 
-                                           currentState + " to " + newState);
-                      currentState = newState; 
-                
-                    } else {
+                    if (!validTransition) {
                         int line = unit.getJavaSourceStartLineNumber();
                         reporter.reportError(variableName, line, newState, currentState);
                         System.out.println("Reported Error: " + variableName + " transition from " + 
                                            currentState + " to " + newState + " at line " + line);
+                    } else {
+                        next.put(variableName, newState);
+                        System.out.println("State Transition: " + variableName + " from " + 
+                                           currentState + " to " + newState);
                     }
                 }
             }
@@ -135,5 +131,6 @@ public class KittenChecker extends BodyTransformer {
         }
     }
 }
+
 
 
