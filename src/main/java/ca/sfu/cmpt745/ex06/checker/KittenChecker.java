@@ -76,23 +76,48 @@ public class KittenChecker extends BodyTransformer {
             next.putAll(current); 
 
             if (unit instanceof InvokeStmt) {
-                InvokeStmt stmt = (InvokeStmt) unit;
-                InvokeExpr invokeExpr = stmt.getInvokeExpr();
-                if (invokeExpr instanceof InstanceInvokeExpr) {
-                    InstanceInvokeExpr instanceInvokeExpr = (InstanceInvokeExpr) invokeExpr;
-                    String variableName = instanceInvokeExpr.getBase().toString();
-                    String methodName = invokeExpr.getMethod().getName();
-                    String currentState = current.getOrDefault(variableName, "sleeping");
-                    String newState = mapMethodNameToState(methodName);
-                    boolean validTransition = isValidTransition(currentState, methodName);
-                    if (!validTransition) {
-                        int line = unit.getJavaSourceStartLineNumber();
-                        reporter.reportError(variableName, line, newState, currentState);
-                    } else {
-                        next.put(variableName, newState);
-                    }
+                handleInvokeStatement((InvokeStmt) unit, current, next);
+            }
+            
+            // Loop detection and handling
+            if (isLoopHead(unit)) {
+                Map<String, String> mergedState = mergeStatesAtLoopHead(unit, current);
+                Map<String, String> loopBodyState = analyzeLoopBody(unit, mergedState);
+                next.putAll(loopBodyState);
+            }
+        }
+
+        private void handleInvokeStatement(InvokeStmt stmt, Map<String, String> current, Map<String, String> next) {
+            InvokeExpr invokeExpr = stmt.getInvokeExpr();
+            if (invokeExpr instanceof InstanceInvokeExpr) {
+                InstanceInvokeExpr instanceInvokeExpr = (InstanceInvokeExpr) invokeExpr;
+                String variableName = instanceInvokeExpr.getBase().toString();
+                String methodName = invokeExpr.getMethod().getName();
+                String currentState = current.getOrDefault(variableName, "sleeping");
+                String newState = mapMethodNameToState(methodName);
+                boolean validTransition = isValidTransition(currentState, methodName);
+                if (!validTransition) {
+                    int line = stmt.getJavaSourceStartLineNumber();
+                    reporter.reportError(variableName, line, newState, currentState);
+                } else {
+                    next.put(variableName, newState);
                 }
             }
+        }
+
+
+        private boolean isLoopHead(Unit unit) {
+            
+            return false; 
+        }
+
+        private Map<String, String> mergeStatesAtLoopHead(Unit loopHead, Map<String, String> current) {
+            
+            return new HashMap<>(current); 
+        }
+
+        private Map<String, String> analyzeLoopBody(Unit loopHead, Map<String, String> initialState) {
+            
         }
 
         private boolean isValidTransition(String currentState, String methodName) {
@@ -117,7 +142,6 @@ public class KittenChecker extends BodyTransformer {
         }
     }
 }
-
 
 
 
