@@ -187,9 +187,42 @@ public class KittenChecker extends BodyTransformer {
         }
 
         private Map<String, String> analyzeLoopBody(Unit loopHead, Map<String, String> initialState) {
-            
-        }
+            Map<String, String> currentState = new HashMap<>(initialState);
+            boolean changesMade;
 
+            
+            Set<Unit> visitedUnits = new HashSet<>();
+            List<Unit> worklist = new ArrayList<>();
+            worklist.add(loopHead);
+
+            do {
+                changesMade = false;
+
+                List<Unit> newWorklist = new ArrayList<>();
+                for (Unit unit : worklist) {
+                    if (visitedUnits.contains(unit)) continue; 
+                    visitedUnits.add(unit);
+
+        
+                    Map<String, String> nextState = new HashMap<>(currentState);
+                    if (unit instanceof InvokeStmt) {
+                        InvokeStmt stmt = (InvokeStmt) unit;
+                        handleInvokeStatement(stmt, currentState, nextState);
+                    }
+
+            
+                    if (!nextState.equals(currentState)) {
+                        changesMade = true;
+                        currentState.putAll(nextState); 
+                        newWorklist.addAll(graph.getSuccsOf(unit)); 
+                    }
+                }
+
+                worklist = newWorklist; 
+            } while (changesMade && !worklist.isEmpty());
+
+            return currentState; 
+        }
         private boolean isValidTransition(String currentState, String methodName) {
             switch (methodName) {
                 case "pet": return !currentState.equals("running") && !currentState.equals("playing");
@@ -212,5 +245,3 @@ public class KittenChecker extends BodyTransformer {
         }
     }
 }
-
-
