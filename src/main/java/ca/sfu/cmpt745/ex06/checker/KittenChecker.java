@@ -20,9 +20,13 @@ import soot.tagkit.Tag;
 import soot.toolkits.graph.DirectedGraph;
 import soot.toolkits.graph.ExceptionalUnitGraph;
 import soot.toolkits.graph.UnitGraph;
-
+import soot.jimple.Stmt;
+import soot.jimple.InvokeExpr;
+import soot.jimple.InstanceInvokeExpr;
 import soot.toolkits.scalar.ForwardFlowAnalysis;
 import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 public class KittenChecker extends BodyTransformer {
     final KittenErrorReporter reporter;
@@ -132,7 +136,33 @@ public class KittenChecker extends BodyTransformer {
             return mergedState;
         }
         private Map<String, String> analyzeLoopBody(Unit loopHead, Map<String, String> initialState) {
+            Map<String, String> currentState = new HashMap<>(initialState);
+
+            List<Unit> toVisit = graph.getSuccsOf(loopHead);
             
+            while (!toVisit.isEmpty()) {
+                Unit currentUnit = toVisit.remove(0); 
+                if (currentUnit instanceof Stmt) {
+                    Stmt stmt = (Stmt) currentUnit;
+                    
+                    if (stmt.containsInvokeExpr()) {
+                        InvokeExpr invokeExpr = stmt.getInvokeExpr();
+                        if (invokeExpr instanceof InstanceInvokeExpr) {
+                            InstanceInvokeExpr instanceInvokeExpr = (InstanceInvokeExpr) invokeExpr;
+                            String methodName = instanceInvokeExpr.getMethod().getName();
+                            String variableName = instanceInvokeExpr.getBase().toString();
+                            
+                            
+                            updateStateBasedOnMethodCall(variableName, methodName, currentState);
+                        }
+                    }
+                    
+                    
+                    toVisit.addAll(graph.getSuccsOf(currentUnit));
+                }
+            }
+            
+            return currentState;
         }
 
         private boolean isValidTransition(String currentState, String methodName) {
