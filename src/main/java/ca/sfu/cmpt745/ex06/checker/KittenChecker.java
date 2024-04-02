@@ -135,6 +135,18 @@ public class KittenChecker extends BodyTransformer {
 
             return mergedState;
         }
+
+
+        private void updateStateBasedOnMethodCall(String variableName, String methodName, Map<String, String> currentStates) {
+            String newState = mapMethodNameToState(methodName);
+            String currentVariableState = currentStates.getOrDefault(variableName, "unknown");
+            if (isValidTransition(currentVariableState, methodName)) {
+                currentStates.put(variableName, newState);
+            } else {
+                currentStates.put(variableName, "error");
+            }
+        }
+
         private Map<String, String> analyzeLoopBody(Unit loopHead, Map<String, String> initialState) {
             Map<String, String> currentState = new HashMap<>(initialState);
 
