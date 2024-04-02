@@ -117,9 +117,19 @@ public class KittenChecker extends BodyTransformer {
 
         private void handleLoop(Map<String, Set<String>> states) {
             
-            states.forEach((variable, possibleStates) -> {
-                
-            });
+            for (Map.Entry<String, Set<String>> entry : states.entrySet()) {
+                String variableName = entry.getKey();
+            
+                Set<String> allPossibleStates = getAllPossibleStates();
+
+                // Conservatively assume the variable could transition to any state due to the loop
+                states.put(variableName, allPossibleStates);
+            }
+        }
+
+        private Set<String> getAllPossibleStates() {
+         
+            return new HashSet<>(Arrays.asList("sleeping", "eating", "playing", "plotting", "running"));
         }
         private void reportError(String variableName, InvokeStmt stmt, String currentState, String targetState) {
             int line = stmt.getJavaSourceStartLineNumber();
